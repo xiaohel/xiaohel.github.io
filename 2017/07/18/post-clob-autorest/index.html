@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   
-  <title>e^πi+1=0</title>
+  <title>ORDS AutoREST POST CLOB类型的列 | e^πi+1=0</title>
   <meta name="author" content="Xiaohe Lan">
   
   <meta name="description" content="Tips for ORDS, SQLcl, etc.">
@@ -11,7 +11,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
-  
+  <meta property="og:title" content="ORDS AutoREST POST CLOB类型的列"/>
   <meta property="og:site_name" content="e^πi+1=0"/>
 
   
@@ -47,66 +47,7 @@
 <div class="clearfix"></div>
 </header>
   <div id="content" class="inner">
-    <div id="main-col" class="alignleft"><div id="wrapper">
-  <article class="post">
-  
-  <div class="post-content">
-    <header>
-      
-        <div class="icon"></div>
-        <time datetime="2017-07-18T09:01:31.000Z"><a href="/2017/07/18/ords-restful-services-blob/">2017-07-18</a></time>
-      
-      
-  
-    <h1 class="title"><a href="/2017/07/18/ords-restful-services-blob/">ORDS RESTful Service支持BLOB类型</a></h1>
-  
-
-    </header>
-    <div class="entry">
-      
-        <p>如果在 <em>Oracle</em> 数据库中以 <code>BLOB</code> 类型存储图片，能不能通过 <em>ORDS RESTful Service</em> 获取图片？当然可以。使用 <strong>PL/SQL</strong> 将图片插入到数据库。下面的语句除了使用 <em>sys</em> 授权外我都是以 <em>restdev</em> 这个用户执行。</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line">SQL&gt; show user</div><div class="line">USER is "SYS"</div><div class="line">SQL&gt; grant create any directory to restdev;</div><div class="line"></div><div class="line">Grant succeeded.</div><div class="line"></div><div class="line">SQL&gt; conn restdev/restdev@//localhost:1521/pdb1.us.oracle.com</div><div class="line">Connected.</div><div class="line">SQL&gt; create directory image_files as '/home/oracle';</div><div class="line"></div><div class="line">Directory created.</div><div class="line"></div><div class="line">SQL&gt; create table images(id number, mime varchar2(100), image blob);</div><div class="line">SQL&gt; declare</div><div class="line">  l_blob blob;</div><div class="line">  v_src_loc  bfile := bfilename('IMAGE_FILES', 'xilan.jpg');</div><div class="line">  v_amount   integer;</div><div class="line">begin</div><div class="line">  insert into images values (100, 'image/png', empty_blob()) return image into l_blob;</div><div class="line">  dbms_lob.open(v_src_loc, dbms_lob.lob_readonly);</div><div class="line">  v_amount := dbms_lob.getlength(v_src_loc);</div><div class="line">  dbms_lob.loadfromfile(l_blob, v_src_loc, v_amount);</div><div class="line">  dbms_lob.close(v_src_loc);</div><div class="line">  commit;</div><div class="line">end;</div><div class="line">/</div><div class="line"></div><div class="line">PL/SQL procedure successfully completed.</div><div class="line"></div><div class="line">SQL&gt;</div></pre></td></tr></table></figure>
-<p>确保 <em>/home/oracle/xilan.jpg</em> 确实是存在的，这时就已经可以在 <em>SQL Developer</em> 中查看那个<code>BLOB</code>字段了：</p>
-<p><img src="/images/view_blob.png" alt="drawing"></p>
-<p>前期准备工作做完了，接下来开发一个ORDS RESTful Service，然后通过浏览器访问那个 <strong>Endpoint</strong> 获得<code>BLOB</code>的内容。这里顺便介绍 <em>SQL Developer</em> 4.2的一个新特性。现在你不需要使用 <em>View -&gt; REST Data Services -&gt; Development</em> 那个界面连接 <em>ORDS</em> 然后开发了，自然 <em>ORDS</em> 本身也不需要使用 <code>java -jar ords.war user ...</code> 命令创建一个有 <code>SQL Developer</code> 角色的用户。</p>
-<p>一些简单的步骤：</p>
-<ol>
-<li><p>REST Enable the schema</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">SQL&gt; begin</div><div class="line">  2    ords.enable_schema;</div><div class="line">  3    commit;</div><div class="line">  4  end;</div><div class="line">  5  /</div><div class="line"></div><div class="line">PL/SQL procedure successfully completed.</div></pre></td></tr></table></figure>
-</li>
-<li><p>使用4.2版本的新节点 <em>REST Data Services</em> 新建一个 <em>Module</em><br><img src="/images/new_module.png" alt="drawing"></p>
-</li>
-<li><p>指定 <em>Module Name</em> 和 <em>URI Prefix</em><br><img src="/images/module_name.png" alt="drawing"></p>
-</li>
-<li><p>指定 <em>URI Pattern</em> 并一直点 <em>Next</em> 按钮完成创建<br><img src="/images/uri_pattern.png" alt="drawing"></p>
-</li>
-<li><p>创建一个 <em>GET handler</em><br><img src="/images/create_get_handler.png" alt="drawing"></p>
-</li>
-<li><p>因为要处理的是 <code>BLOB</code> 类型的数据，将 <em>Source Type</em> 指定为 <em>Media Type</em><br><img src="/images/source_type.png" alt="drawing"></p>
-</li>
-<li><p>为 <em>GET handler</em> 指定查询语句， <code>mime</code> 字段将被浏览器使用来解析 <code>BLOB</code> 字段<br><img src="/images/get_handler_sql.png" alt="drawing"></p>
-</li>
-<li><p>点击保存</p>
-</li>
-<li>启动 <em>ORDS</em> 并且访问 <em><a href="http://localhost:8080/ords/restdev/hr/imags/100" target="_blank" rel="external">http://localhost:8080/ords/restdev/hr/imags/100</a></em> 就能在浏览器显示刚刚插入的图片了：<br><img src="/images/image_100.png" alt="drawing"></li>
-</ol>
-
-      
-    </div>
-    <footer>
-      
-        
-        
-      
-      <div class="clearfix"></div>
-    </footer>
-  </div>
-</article>
-
-
-
-
-  <article class="post">
+    <div id="main-col" class="alignleft"><div id="wrapper"><article class="post">
   
   <div class="post-content">
     <header>
@@ -116,7 +57,7 @@
       
       
   
-    <h1 class="title"><a href="/2017/07/18/post-clob-autorest/">ORDS AutoREST POST CLOB类型的列</a></h1>
+    <h1 class="title">ORDS AutoREST POST CLOB类型的列</h1>
   
 
     </header>
@@ -134,6 +75,12 @@
       
         
         
+  
+  <div class="tags">
+    <a href="/tags/ORDS/">ORDS</a>, <a href="/tags/AutoREST/">AutoREST</a>, <a href="/tags/Clob/">Clob</a>
+  </div>
+
+        
       
       <div class="clearfix"></div>
     </footer>
@@ -141,14 +88,27 @@
 </article>
 
 
+<section id="comment">
+  <h1 class="title">留言</h1>
 
-
-
-<nav id="pagination">
   
+      <div id="fb-root"></div>
+<script>
+  (function(d, s, id) {
+    var js, fjs = d.getElementsByTagName(s)[0];
+    if (d.getElementById(id)) return;
+    js = d.createElement(s); js.id = id;
+    js.src = "//connect.facebook.net/en_US/all.js#xfbml=1&appId=123456789012345";
+    fjs.parentNode.insertBefore(js, fjs);
+  }(document, 'script', 'facebook-jssdk'));
+</script>
+
+<div class="fb-comments" data-href="http://xiaohel.github.io/2017/07/18/post-clob-autorest/index.html" data-num-posts="5" data-width="840" data-colorscheme="light"></div>
+      
   
-  <div class="clearfix"></div>
-</nav></div></div>
+</section>
+
+</div></div>
     <aside id="sidebar" class="alignright">
   <div class="search">
   <form action="//google.com/search" method="get" accept-charset="utf-8">
